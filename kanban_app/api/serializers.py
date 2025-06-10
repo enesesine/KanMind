@@ -41,24 +41,34 @@ class TaskSerializer(serializers.ModelSerializer):
 # Task – write serializer for creating new tasks
 # ------------------------- #
 class TaskCreateSerializer(serializers.ModelSerializer):
-    """Handles task creation with permission and board membership checks."""
+    """Serializer to create a new task within a board."""
+
     board_id    = serializers.IntegerField(write_only=True)
     assignee_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
+    # Output fields
+    assignee       = UserMiniSerializer(read_only=True, allow_null=True)
+    reviewer       = UserMiniSerializer(read_only=True, allow_null=True)
+    board          = serializers.PrimaryKeyRelatedField(read_only=True)
+    comments_count = serializers.SerializerMethodField()
+
     class Meta:
-        model  = Task
+        model = Task
         fields = [
             "board_id", "title", "description",
             "status", "priority",
             "assignee_id", "reviewer_id",
             "due_date",
-            "id", "board", "assignee", "reviewer",
+            "id", "board", "assignee", "reviewer", "comments_count"
         ]
-        read_only_fields = ["id", "board", "assignee", "reviewer"]
+        read_only_fields = ["id", "board", "assignee", "reviewer", "comments_count"]
+
+    def get_comments_count(self, obj):
+        return obj.comments.count()
 
     def validate(self, attrs):
-        user     = self.context["request"].user
+        user = self.context["request"].user
         board_id = attrs["board_id"]
 
         try:
@@ -66,11 +76,9 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         except Board.DoesNotExist:
             raise serializers.ValidationError({"board_id": "Board not found."})
 
-        # Only board members or the owner can create a task
         if user != board.owner and user not in board.members.all():
             raise serializers.ValidationError("You are not a member of this board.")
 
-        # Optional assignee/reviewer must also be members
         for key in ("assignee_id", "reviewer_id"):
             uid = attrs.get(key)
             if uid is not None:
@@ -79,7 +87,7 @@ class TaskCreateSerializer(serializers.ModelSerializer):
                 except CustomUser.DoesNotExist:
                     raise serializers.ValidationError({key: "User is not a member of that board."})
 
-        attrs["board"] = board
+        attrs["board"] = board  # attach resolved Board instance
         return attrs
 
     def create(self, validated_data):
@@ -94,6 +102,7 @@ class TaskCreateSerializer(serializers.ModelSerializer):
             reviewer   = CustomUser.objects.filter(pk=reviewer_id).first(),
             **validated_data,
         )
+
 
 
 # ------------------------- #
