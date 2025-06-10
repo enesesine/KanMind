@@ -175,20 +175,28 @@ class TaskCommentsView(ListCreateAPIView):
         task_id = self.kwargs["task_id"]
         task = get_object_or_404(Task.objects.select_related("board"), pk=task_id)
 
-        user  = self.request.user
+        user = self.request.user
         board = task.board
         if user != board.owner and user not in board.members.all():
             raise PermissionDenied("Only board members may view or create comments.")
 
         return task.comments.all()
 
-    def perform_create(self, serializer):
-        task  = get_object_or_404(Task.objects.select_related("board"), pk=self.kwargs["task_id"])
-        user  = self.request.user
+    def create(self, request, *args, **kwargs):
+        task = get_object_or_404(Task.objects.select_related("board"), pk=self.kwargs["task_id"])
+        user = request.user
         board = task.board
+
         if user != board.owner and user not in board.members.all():
             raise PermissionDenied("Only board members may create comments.")
-        serializer.save(author=user, task=task)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        comment = serializer.save(author=user, task=task)
+
+        return Response(CommentSerializer(comment).data, status=201)
+
+
 
 
 # ==========================
