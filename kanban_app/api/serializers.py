@@ -18,10 +18,10 @@ class UserMiniSerializer(serializers.ModelSerializer):
 # ------------------------- #
 class TaskSerializer(serializers.ModelSerializer):
     """Returns task details with assignee/reviewer as nested users."""
-    assignee       = UserMiniSerializer(read_only=True)
-    reviewer       = UserMiniSerializer(read_only=True)
+    assignee = UserMiniSerializer(read_only=True, allow_null=True)
+    reviewer = UserMiniSerializer(read_only=True, allow_null=True)
     comments_count = serializers.SerializerMethodField()
-    board          = serializers.PrimaryKeyRelatedField(read_only=True)
+    board = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model  = Task

@@ -122,12 +122,11 @@ class TaskListCreateView(ListCreateAPIView):
         u = self.request.user
         return Task.objects.filter(Q(board__owner=u) | Q(board__members=u)).distinct()
 
-    def create(self, request, *args, **kwargs):
-        ser = self.get_serializer(data=request.data, context={"request": request})
-        ser.is_valid(raise_exception=True)
-        task = ser.save()
-        return Response(TaskSerializer(task).data, status=201)
-
+def create(self, request, *args, **kwargs):
+    ser = self.get_serializer(data=request.data, context={"request": request})
+    ser.is_valid(raise_exception=True)
+    task = ser.save()
+    return Response(TaskSerializer(task).data, status=201)
 
 # ==========================
 # TASK – Detail / Update / Delete
