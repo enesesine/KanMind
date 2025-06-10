@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtualenv
+venv/
+
+# Environment-File
+.env
+.env.local
+
+# SQLite DB
+db.sqlite3
+
+# macOS
+.DS_Store
