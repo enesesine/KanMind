@@ -1,11 +1,10 @@
-# kanban_app/models.py
 from django.db import models
 from auth_app.models import CustomUser
 
 
 class Board(models.Model):
     """
-    Ein Kanban-Board.  Owner = Ersteller, Members = berechtigte User.
+    A Kanban board. 'owner' creates the board, 'members' can access it.
     """
     title = models.CharField(max_length=255)
 
@@ -15,7 +14,7 @@ class Board(models.Model):
         related_name="owned_boards",
     )
 
-    # weitere Nutzer mit Zugriff auf das Board
+    # Users who are members of this board
     members = models.ManyToManyField(
         CustomUser,
         related_name="boards",
@@ -28,24 +27,24 @@ class Board(models.Model):
 
 class Task(models.Model):
     """
-    Eine einzelne Karte innerhalb eines Boards.
+    A task card within a board.
     """
 
-    # ---------- Wahlfelder -------------------------------------------------
+    # ----------- Choice fields ----------
     PRIORITY_CHOICES = (
         ("low",    "Low"),
         ("medium", "Medium"),
         ("high",   "High"),
     )
 
-    STATUS_CHOICES = (                              # inkl. „review“
+    STATUS_CHOICES = (
         ("todo",        "To Do"),
         ("in_progress", "In Progress"),
         ("review",      "Review"),
         ("done",        "Done"),
     )
 
-    # ---------- Grunddaten -------------------------------------------------
+    # ----------- Core fields -----------
     title       = models.CharField(max_length=255)
     description = models.TextField(blank=True)
 
@@ -60,14 +59,14 @@ class Task(models.Model):
         default="todo",
     )
 
-    # ---------- Beziehungen -----------------------------------------------
+    # ----------- Relations -------------
     board = models.ForeignKey(
         Board,
         on_delete=models.CASCADE,
         related_name="tasks",
     )
 
-    # wer die Task angelegt hat (für DELETE-Berechtigung)
+    # User who created the task (used for permission checks)
     created_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
@@ -75,14 +74,17 @@ class Task(models.Model):
         related_name="created_tasks",
     )
 
-    assignee = models.ForeignKey(                   # Bearbeiter
+    # Assigned user (optional)
+    assignee = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="assigned_tasks",
     )
-    reviewer = models.ForeignKey(                   # Prüfer
+
+    # Reviewer user (optional)
+    reviewer = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         null=True,
@@ -98,19 +100,19 @@ class Task(models.Model):
 
 class Comment(models.Model):
     """
-    Ein Kommentar an eine Task.
+    A comment attached to a task.
     """
-    task       = models.ForeignKey(
+    task = models.ForeignKey(
         Task,
         on_delete=models.CASCADE,
         related_name="comments",
     )
-    author     = models.ForeignKey(
+    author = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
         related_name="comments",
     )
-    content    = models.TextField()
+    content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
