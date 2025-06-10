@@ -8,19 +8,23 @@ from auth_app.models import CustomUser
 from auth_app.api.serializers import RegistrationSerializer
 
 
-# ---------- REGISTRIERUNG ----------
+# ==========================
+# Registration View
+# ==========================
 class RegistrationView(APIView):
     """
+    Registers a new user.
     POST /api/registration/
-    Body:
+    Expected body:
     {
       "fullname": "Max Mustermann",
       "email":    "max@test.com",
       "password": "superSecret123!",
       "repeated_password": "superSecret123!"
     }
+    Returns user info and token on success.
     """
-    permission_classes: list = []  
+    permission_classes: list = []  # Public endpoint
 
     def post(self, request):
         serializer = RegistrationSerializer(data=request.data)
@@ -41,17 +45,21 @@ class RegistrationView(APIView):
         )
 
 
-# ---------- LOGIN ----------
+# ==========================
+# Login View
+# ==========================
 class LoginView(APIView):
     """
+    Authenticates a user.
     POST /api/login/
-    Body:
+    Expected body:
     {
       "email":    "max@test.com",
       "password": "superSecret123!"
     }
+    Returns token and user info on success.
     """
-    permission_classes: list = []  
+    permission_classes: list = []  # Public endpoint
 
     def post(self, request):
         email = request.data.get("email")
@@ -59,11 +67,10 @@ class LoginView(APIView):
 
         if not email or not password:
             return Response(
-                {"detail": "Email und Passwort müssen angegeben werden."},
+                {"detail": "Email and password are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-      
         users_qs = CustomUser.objects.filter(email=email)
         if not users_qs.exists():
             return Response({"detail": "Invalid credentials."},
@@ -87,15 +94,18 @@ class LoginView(APIView):
         )
 
 
-# ---------- EMAIL-CHECK ----------
+# ==========================
+# Email Check View
+# ==========================
 class EmailCheckView(APIView):
     """
+    Checks if a given email exists.
     GET /api/email-check/?email=<addr>
-    Header:  Authorization: Token <token>
+    Requires authentication.
 
-    * 200 → User‐Objekt falls vorhanden
-    * 404 → nicht gefunden
-    * 400 → Parameter fehlt / Format falsch
+    * 200: user info found
+    * 404: email not found
+    * 400: parameter missing or invalid format
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -105,7 +115,6 @@ class EmailCheckView(APIView):
             return Response({"detail": "email parameter missing."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-      
         try:
             validate_email(email)
         except ValidationError:

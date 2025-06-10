@@ -1,4 +1,3 @@
-
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
@@ -27,10 +26,12 @@ from kanban_app.api.serializers import (
 from auth_app.models import CustomUser
 
 
-
-#  BOARDS
+# ==========================
+# BOARDS
+# ==========================
 
 class BoardListCreateView(ListCreateAPIView):
+    """List all boards where user is owner or member; create new board."""
     serializer_class   = BoardSerializer
     permission_classes = [IsAuthenticated]
 
@@ -43,6 +44,7 @@ class BoardListCreateView(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         board = serializer.save(owner=request.user)
 
+        # Build response including stats
         payload = BoardSerializer(board).data | {
             "owner_id":              request.user.id,
             "member_count":          board.members.count(),
@@ -54,6 +56,7 @@ class BoardListCreateView(ListCreateAPIView):
 
 
 class BoardDetailView(RetrieveUpdateDestroyAPIView):
+    """View, update or delete a specific board."""
     queryset           = Board.objects.all()
     permission_classes = [IsAuthenticated]
     lookup_field       = "id"
@@ -67,20 +70,23 @@ class BoardDetailView(RetrieveUpdateDestroyAPIView):
         board = super().get_object()
         user  = self.request.user
         if user != board.owner and user not in board.members.all():
-            raise PermissionDenied("Kein Zugriff auf dieses Board.")
+            raise PermissionDenied("Access denied – not a board member.")
         return board
 
     def delete(self, request, *args, **kwargs):
         board = self.get_object()
         if request.user != board.owner:
-            raise PermissionDenied("Nur der Eigentümer darf das Board löschen.")
+            raise PermissionDenied("Only the owner can delete the board.")
         board.delete()
         return Response(status=204)
 
 
-#  TASK-LISTEN (Assigned / Reviewing)
+# ==========================
+# TASK LISTS
+# ==========================
 
 class MyAssignedTasksView(ListAPIView):
+    """List tasks where the user is assignee or reviewer."""
     serializer_class   = TaskSerializer
     permission_classes = [IsAuthenticated]
 
@@ -90,6 +96,7 @@ class MyAssignedTasksView(ListAPIView):
 
 
 class MyReviewingTasksView(ListAPIView):
+    """List tasks where the user is reviewer but not assignee."""
     serializer_class   = TaskSerializer
     permission_classes = [IsAuthenticated]
 
@@ -98,10 +105,12 @@ class MyReviewingTasksView(ListAPIView):
         return Task.objects.filter(reviewer=u).exclude(assignee=u)
 
 
-
-#  TASK – Create  (POST /api/tasks/)
+# ==========================
+# TASK – Create and List
+# ==========================
 
 class TaskListCreateView(ListCreateAPIView):
+    """List tasks across all accessible boards; create new task."""
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
@@ -120,10 +129,12 @@ class TaskListCreateView(ListCreateAPIView):
         return Response(TaskSerializer(task).data, status=201)
 
 
-
-#  TASK – Detail / Update / Delete (GET, PATCH, DELETE /api/tasks/<id>/)
+# ==========================
+# TASK – Detail / Update / Delete
+# ==========================
 
 class TaskDetailView(RetrieveUpdateDestroyAPIView):
+    """View, update or delete a specific task."""
     permission_classes = [IsAuthenticated]
     lookup_field       = "id"
     queryset           = Task.objects.select_related("board", "assignee", "reviewer")
@@ -138,20 +149,22 @@ class TaskDetailView(RetrieveUpdateDestroyAPIView):
         user  = self.request.user
         board = task.board
         if user != board.owner and user not in board.members.all():
-            raise PermissionDenied("Kein Zugriff – du bist kein Mitglied dieses Boards.")
+            raise PermissionDenied("Access denied – not a board member.")
         return task
 
     def perform_destroy(self, instance: Task):
         user = self.request.user
         if user != instance.created_by and user != instance.board.owner:
-            raise PermissionDenied("Nur Ersteller oder Board-Owner dürfen löschen.")
+            raise PermissionDenied("Only the creator or board owner may delete this task.")
         instance.delete()
 
 
-
-#  TASK – Comments  (GET & POST /api/tasks/<task_id>/comments/)
+# ==========================
+# TASK – Comments List / Create
+# ==========================
 
 class TaskCommentsView(ListCreateAPIView):
+    """List or create comments for a task."""
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
@@ -166,23 +179,25 @@ class TaskCommentsView(ListCreateAPIView):
         user  = self.request.user
         board = task.board
         if user != board.owner and user not in board.members.all():
-            raise PermissionDenied("Nur Mitglieder des Boards dürfen Kommentare sehen oder anlegen.")
+            raise PermissionDenied("Only board members may view or create comments.")
 
         return task.comments.all()
 
     def perform_create(self, serializer):
-        task = get_object_or_404(Task.objects.select_related("board"), pk=self.kwargs["task_id"])
+        task  = get_object_or_404(Task.objects.select_related("board"), pk=self.kwargs["task_id"])
         user  = self.request.user
         board = task.board
         if user != board.owner and user not in board.members.all():
-            raise PermissionDenied("Nur Mitglieder des Boards dürfen Kommentare anlegen.")
+            raise PermissionDenied("Only board members may create comments.")
         serializer.save(author=user, task=task)
 
 
-
-#  COMMENT – Delete  (DELETE /api/tasks/<task_id>/comments/<comment_id>/)
+# ==========================
+# COMMENT – Delete
+# ==========================
 
 class CommentDeleteView(DestroyAPIView):
+    """Delete a specific comment (only allowed for author)."""
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
@@ -193,7 +208,7 @@ class CommentDeleteView(DestroyAPIView):
             pk=comment_id,
             task_id=task_id
         )
-    
+
         if self.request.user != comment.author:
-            raise PermissionDenied("Nur der Ersteller des Kommentars darf ihn löschen.")
+            raise PermissionDenied("Only the author may delete this comment.")
         return comment
