@@ -41,44 +41,47 @@ class TaskSerializer(serializers.ModelSerializer):
 # Task – write serializer for creating new tasks
 # ------------------------- #
 class TaskCreateSerializer(serializers.ModelSerializer):
-    """Serializer to create a new task within a board."""
+    """
+    Create a new task on a board.
+    Accepts `board` in the request body (integer PK) and returns the same
+    field in the response. Performs membership checks for assignee/reviewer.
+    """
 
-    board_id    = serializers.IntegerField(write_only=True)
+    # accepts an integer PK when POSTing, returns PK when serializing back
+    board = serializers.PrimaryKeyRelatedField(queryset=Board.objects.all())
+
     assignee_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     reviewer_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
-    # Output fields
     assignee       = UserMiniSerializer(read_only=True, allow_null=True)
     reviewer       = UserMiniSerializer(read_only=True, allow_null=True)
-    board          = serializers.PrimaryKeyRelatedField(read_only=True)
     comments_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = Task
+        model  = Task
         fields = [
-            "board_id", "title", "description",
+            "board", "title", "description",
             "status", "priority",
             "assignee_id", "reviewer_id",
             "due_date",
-            "id", "board", "assignee", "reviewer", "comments_count"
+            "id", "assignee", "reviewer", "comments_count",
         ]
-        read_only_fields = ["id", "board", "assignee", "reviewer", "comments_count"]
+        read_only_fields = ["id", "assignee", "reviewer", "comments_count"]
 
+    # ---------- helpers ----------
     def get_comments_count(self, obj):
         return obj.comments.count()
 
+    # ---------- validation ----------
     def validate(self, attrs):
-        user = self.context["request"].user
-        board_id = attrs["board_id"]
+        user  = self.context["request"].user
+        board = attrs["board"]                               # Board-Instanz
 
-        try:
-            board = Board.objects.get(pk=board_id)
-        except Board.DoesNotExist:
-            raise serializers.ValidationError({"board_id": "Board not found."})
-
+        # requester must be owner OR member
         if user != board.owner and user not in board.members.all():
             raise serializers.ValidationError("You are not a member of this board.")
 
+        # assignee / reviewer (if provided) must also be board members
         for key in ("assignee_id", "reviewer_id"):
             uid = attrs.get(key)
             if uid is not None:
@@ -87,9 +90,9 @@ class TaskCreateSerializer(serializers.ModelSerializer):
                 except CustomUser.DoesNotExist:
                     raise serializers.ValidationError({key: "User is not a member of that board."})
 
-        attrs["board"] = board  # attach resolved Board instance
         return attrs
 
+    # ---------- creation ----------
     def create(self, validated_data):
         board        = validated_data.pop("board")
         assignee_id  = validated_data.pop("assignee_id", None)
