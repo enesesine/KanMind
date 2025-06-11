@@ -176,8 +176,8 @@ kanmind-backend/
 ## 👤 Author
 
 **Enes Tester**  
-📧 enes@example.com  
-🔗 [GitHub: enes](https://github.com/enes)
+📧 eneslucker@gmail.com  
+🔗 [GitHub: enes](https://github.com/enesesine)
 
 ---
 
